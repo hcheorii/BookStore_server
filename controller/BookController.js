@@ -2,7 +2,6 @@ const conn = require("../mariadb");
 const { StatusCodes } = require("http-status-codes");
 const ensureAuthorization = require("../auth");
 const jwt = require("jsonwebtoken");
-const { all } = require("../routes/orders");
 
 const allBooks = (req, res) => {
     let { category_id, news, limit, currentPage } = req.query;
@@ -35,6 +34,11 @@ const allBooks = (req, res) => {
         }
         console.log(results);
         if (results.length) {
+            //모든 책 가져오는 부분
+            results.map(function (result) {
+                result.pubDate = result.pub_date;
+                delete result.pub_date;
+            });
             allBooksRes.books = results;
         } else {
             return res.status(StatusCodes.NOT_FOUND).end();

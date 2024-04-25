@@ -1,5 +1,4 @@
 const mariadb = require("mysql2");
-
 // Create the connection to database
 
 const connection = mariadb.createConnection({

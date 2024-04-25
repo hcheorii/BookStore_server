@@ -4,17 +4,62 @@ const { StatusCodes } = require("http-status-codes");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
 const crypto = require("crypto");
+const { body, validationResult } = require("express-validator");
 dotenv.config();
 
+const validate = (req, res, next) => {
+    const errors = validationResult(req);
+    if (errors.isEmpty()) {
+        return next();
+    }
+    return res.status(400).json({ errors: errors.array() });
+};
+const generateHashedPassword = (password, salt) => {
+    return crypto
+        .pbkdf2Sync(password, salt, 10000, 10, "sha512")
+        .toString("base64");
+};
+
+const userValidationRules = () => {
+    console.log(3);
+
+    return [
+        body("email")
+            .notEmpty()
+            .isEmail()
+            .withMessage("올바른 이메일을 입력하세요"),
+        body("password")
+            .notEmpty()
+            .isLength({ min: 5, max: 20 })
+            .isString()
+            .withMessage("올바른 비밀번호를 입력하세요"),
+        validate,
+    ];
+};
+
+const emailValidationRules = () => {
+    return [
+        body("email")
+            .notEmpty()
+            .isEmail()
+            .withMessage("올바른 이메일을 입력하세요"),
+        validate,
+    ];
+};
 const join = (req, res) => {
     const { email, password } = req.body;
 
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+        //유효성 검사 통과 못했을 때
+        return res.status(400).json({ erros: errors.array() });
+    }
+
     //비밀번호 암호화
     const salt = crypto.randomBytes(10).toString("base64"); //64길이 만큼의 랜덤 바이트 생성
-    const hashPassword = crypto
-        .pbkdf2Sync(password, salt, 10000, 10, "sha512")
-        .toString("base64");
-    //10000은 해시함수를 반복하는 횟수
+    const hashPassword = generateHashedPassword(password, salt);
+
     let sql = `INSERT INTO users (email, password, salt) VALUES (?, ?, ?)`;
     let values = [email, hashPassword, salt];
     conn.query(sql, values, function (err, results) {
@@ -23,12 +68,25 @@ const join = (req, res) => {
             console.log(err);
             return res.status(StatusCodes.BAD_REQUEST).end();
         }
-        res.status(StatusCodes.CREATED).json(results);
+
+        if (results.affectedRows) {
+            return res.status(StatusCodes.CREATED).json(results);
+        } else {
+            //회원가입이 정상적으로 되지 않았을 때
+            return res.status(StatusCodes.BAD_REQUEST).end();
+        }
     });
 };
 
 const login = (req, res) => {
     const { email, password } = req.body;
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            errors: errors.array(),
+        });
+    }
 
     let sql = `SELECT * FROM users WHERE email = ?`;
     conn.query(sql, email, function (err, results) {
@@ -36,9 +94,13 @@ const login = (req, res) => {
             return res.status(StatusCodes.BAD_REQUEST).end();
         }
         const loginUser = results[0];
-        const hashPassword = crypto
-            .pbkdf2Sync(password, loginUser.salt, 10000, 10, "sha512")
-            .toString("base64");
+        if (!loginUser) {
+            return res
+                .status(StatusCodes.UNAUTHORIZED)
+                .json({ error: "유효한 이메일이 아닙니다." });
+        }
+
+        const hashPassword = generateHashedPassword(password, loginUser.salt);
 
         if (loginUser && loginUser.password == hashPassword) {
             //토큰 발행
@@ -57,7 +119,6 @@ const login = (req, res) => {
             res.cookie("token", token, {
                 httpOnly: true, //너 이거 API로만 활용가능해
             });
-            console.log(token);
             res.status(StatusCodes.OK).json(results);
         } else {
             return res.status(StatusCodes.UNAUTHORIZED).end(); //인증되지 않은 사용자 (401)
@@ -67,6 +128,11 @@ const login = (req, res) => {
 
 const passwordResetRequest = (req, res) => {
     const { email } = req.body;
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
     let sql = "SELECT * FROM users WHERE email = ?";
     conn.query(sql, email, (err, result) => {
         if (err) {
@@ -87,12 +153,15 @@ const passwordResetRequest = (req, res) => {
 
 const passwordReset = (req, res) => {
     const { email, password } = req.body; //이전 페이지에서 입력했던 이메일(요청에서 response로 넘겨준다)
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
 
     let sql = "UPDATE users SET password = ?, salt = ? WHERE email = ?";
     const salt = crypto.randomBytes(10).toString("base64"); //64길이 만큼의 랜덤 바이트 생성
-    const hashPassword = crypto
-        .pbkdf2Sync(password, salt, 10000, 10, "sha512")
-        .toString("base64");
+    const hashPassword = generateHashedPassword(password, salt);
     let values = [hashPassword, salt, email];
     conn.query(sql, values, (err, result) => {
         if (err) {
@@ -108,4 +177,12 @@ const passwordReset = (req, res) => {
     });
 };
 
-module.exports = { join, login, passwordReset, passwordResetRequest };
+module.exports = {
+    join,
+    login,
+    passwordReset,
+    passwordResetRequest,
+    userValidationRules,
+    validate,
+    emailValidationRules,
+};
