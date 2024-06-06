@@ -12,7 +12,7 @@ const validate = (req, res, next) => {
     if (errors.isEmpty()) {
         return next();
     }
-    return res.status(400).json({ errors: errors.array() });
+    return res.status(401).json({ errors: errors.array() });
 };
 const generateHashedPassword = (password, salt) => {
     return crypto
@@ -21,8 +21,6 @@ const generateHashedPassword = (password, salt) => {
 };
 
 const userValidationRules = () => {
-    console.log(3);
-
     return [
         body("email")
             .notEmpty()
@@ -91,7 +89,7 @@ const login = (req, res) => {
     let sql = `SELECT * FROM users WHERE email = ?`;
     conn.query(sql, email, function (err, results) {
         if (err) {
-            return res.status(StatusCodes.BAD_REQUEST).end();
+            return res.status(StatusCodes.UNAUTHORIZED).end();
         }
         const loginUser = results[0];
         if (!loginUser) {
@@ -119,7 +117,7 @@ const login = (req, res) => {
             res.cookie("token", token, {
                 httpOnly: true, //너 이거 API로만 활용가능해
             });
-            res.status(StatusCodes.OK).json(results);
+            res.status(StatusCodes.OK).json({ ...results[0], token: token });
         } else {
             return res.status(StatusCodes.UNAUTHORIZED).end(); //인증되지 않은 사용자 (401)
         }

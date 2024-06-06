@@ -19,7 +19,10 @@ const cartValidationRules = () => {
     return [
         body("book_id")
             .notEmpty()
-            .isInt()
+            .custom((value) => {
+                // 숫자로만 이루어진 문자열인지 확인하는 검증 로직
+                return /^\d+$/.test(value);
+            })
             .withMessage("책 제품 번호를 입력하세요"),
         body("quantity").notEmpty().isInt().withMessage("책 개수를 입력하세요"),
         validate,

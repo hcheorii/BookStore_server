@@ -25,41 +25,40 @@ const allBooks = (req, res) => {
     }
 
     sql += ` LIMIT ? OFFSET ?`; // LIMIT과 OFFSET 추가
-    values.push(parseInt(limit), parseInt(offset)); // 값 추가
+    values.push(parseInt(limit), offset);
 
     conn.query(sql, values, (err, results) => {
         // 쿼리 실행
         if (err) {
             console.log(err);
+            return res.status(StatusCodes.BAD_REQUEST).end(); // 에러 발생 시 응답
         }
         console.log(results);
-        if (results.length) {
-            //모든 책 가져오는 부분
-            results.map(function (result) {
-                result.pubDate = result.pub_date;
-                delete result.pub_date;
-            });
-            allBooksRes.books = results;
-        } else {
-            return res.status(StatusCodes.NOT_FOUND).end();
-        }
-    });
 
-    sql = `SELECT found_rows()`; // LIMIT과 OFFSET 추가
+        // 변경된 부분: 항상 빈 배열을 반환하도록 수정
+        results.map(function (result) {
+            result.pubDate = result.pub_date;
+            delete result.pub_date;
+        });
+        allBooksRes.books = results;
 
-    conn.query(sql, (err, results) => {
-        // 쿼리 실행
-        if (err) {
-            console.log(err);
-            return res.status(StatusCodes.BAD_REQUEST).end();
-        }
-        let pagination = {};
-        pagination.currentPage = parseInt(currentPage);
-        console.log(results[0]);
-        pagination.totalCount = results[0]["found_rows()"];
+        // 만약 results가 빈 배열이라도, 아래 부분이 실행되도록 수정
+        sql = `SELECT found_rows()`; // LIMIT과 OFFSET 추가
 
-        allBooksRes.pagination = pagination;
-        return res.status(StatusCodes.OK).json(allBooksRes);
+        conn.query(sql, (err, results) => {
+            // 두 번째 쿼리 실행
+            if (err) {
+                console.log(err);
+                return res.status(StatusCodes.BAD_REQUEST).end();
+            }
+            let pagination = {};
+            pagination.currentPage = parseInt(currentPage);
+            console.log(results[0]);
+            pagination.totalCount = results[0]["found_rows()"];
+
+            allBooksRes.pagination = pagination;
+            return res.status(StatusCodes.OK).json(allBooksRes); // 빈 배열일 경우에도 OK 응답을 반환
+        });
     });
 };
 
