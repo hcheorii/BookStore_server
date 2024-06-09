@@ -13,6 +13,7 @@ const addLike = (req, res) => {
             message: "로그인 세션이 만료되었습니다. 다시 로그인 하세요.",
         });
     } else if (authorization instanceof jwt.JsonWebTokenError) {
+        console.log(1);
         return res.status(StatusCodes.BAD_REQUEST).json({
             message: "잘못된 토큰입니다.",
         });
@@ -22,6 +23,7 @@ const addLike = (req, res) => {
         conn.query(sql, values, (err, results) => {
             if (err) {
                 //서버측 에러
+                console.log(2);
                 console.log(err);
                 return res.status(StatusCodes.BAD_REQUEST).end();
             }

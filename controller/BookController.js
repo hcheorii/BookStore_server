@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 
 const allBooks = (req, res) => {
     let { category_id, news, limit, currentPage } = req.query;
+
     let offset = limit * (currentPage - 1);
     let allBooksRes = {};
     let sql = `SELECT SQL_CALC_FOUND_ROWS *, (SELECT count(*) FROM likes WHERE books.id=liked_book_id) AS likes FROM books`; //좋아요 개수가 포함된 books테이블 조회

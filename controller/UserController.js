@@ -78,48 +78,47 @@ const join = (req, res) => {
 
 const login = (req, res) => {
     const { email, password } = req.body;
-
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({
-            errors: errors.array(),
-        });
-    }
-
     let sql = `SELECT * FROM users WHERE email = ?`;
-    conn.query(sql, email, function (err, results) {
+    conn.query(sql, email, (err, results) => {
         if (err) {
-            return res.status(StatusCodes.UNAUTHORIZED).end();
+            console.log(err);
+            return res.status(StatusCodes.BAD_REQUEST).end();
         }
+
         const loginUser = results[0];
-        if (!loginUser) {
-            return res
-                .status(StatusCodes.UNAUTHORIZED)
-                .json({ error: "유효한 이메일이 아닙니다." });
-        }
 
-        const hashPassword = generateHashedPassword(password, loginUser.salt);
+        // salt 값 꺼내서 비밀번호 암호화 해보고
+        const hashPassword = crypto
+            .pbkdf2Sync(password, loginUser.salt, 10000, 10, "sha512")
+            .toString("base64");
 
+        // => DB 비밀번호랑 비교
         if (loginUser && loginUser.password == hashPassword) {
-            //토큰 발행
+            // 토큰 발행
             const token = jwt.sign(
                 {
-                    email: loginUser.email,
                     id: loginUser.id,
+                    email: loginUser.email,
                 },
                 process.env.PRIVATE_KEY,
                 {
-                    expiresIn: "5m",
+                    expiresIn: "100000m",
                     issuer: "hclee",
                 }
             );
+
             //토큰 쿠키에 담기
             res.cookie("token", token, {
-                httpOnly: true, //너 이거 API로만 활용가능해
+                httpOnly: true,
             });
-            res.status(StatusCodes.OK).json({ ...results[0], token: token });
+            console.log(token);
+
+            return res.status(StatusCodes.OK).json({
+                ...results[0],
+                token: token,
+            });
         } else {
-            return res.status(StatusCodes.UNAUTHORIZED).end(); //인증되지 않은 사용자 (401)
+            return res.status(StatusCodes.UNAUTHORIZED).end();
         }
     });
 };

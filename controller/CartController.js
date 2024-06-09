@@ -33,13 +33,15 @@ const cartValidationRules = () => {
 const addToCart = (req, res) => {
     const { book_id, quantity } = req.body;
     const errors = validationResult(req);
-    console.log(1);
-    if (!errors.isEmpty()) {
-        //유효성 검사 통과 못했을 때
-        return res.status(400).json({ erros: errors.array() });
-    }
-    let authorization = ensureAuthorization(req, res);
 
+    if (!errors.isEmpty()) {
+        // 유효성 검사 통과 못했을 때
+        return res
+            .status(StatusCodes.BAD_REQUEST)
+            .json({ errors: errors.array() });
+    }
+
+    const authorization = ensureAuthorization(req, res);
     if (authorization instanceof jwt.TokenExpiredError) {
         return res.status(StatusCodes.UNAUTHORIZED).json({
             message: "로그인 세션이 만료되었습니다. 다시 로그인 하세요.",
@@ -48,12 +50,16 @@ const addToCart = (req, res) => {
         return res.status(StatusCodes.BAD_REQUEST).json({
             message: "잘못된 토큰입니다.",
         });
+    } else if (!authorization.id) {
+        return res.status(StatusCodes.UNAUTHORIZED).json({
+            message: "사용자 정보가 없습니다.",
+        });
     } else {
         let sql = `INSERT INTO cartItems (book_id, quantity, user_id) VALUES (?, ?, ?)`;
         let values = [book_id, quantity, authorization.id];
         conn.query(sql, values, (err, results) => {
             if (err) {
-                //서버측 에러
+                // 서버측 에러
                 console.log(err);
                 return res.status(StatusCodes.BAD_REQUEST).end();
             }
